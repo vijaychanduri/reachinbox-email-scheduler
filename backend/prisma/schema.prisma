@@ -1,0 +1,81 @@
+// Prisma schema for ReachInbox Email Scheduler
+// Run: npx prisma migrate dev
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  googleId  String   @unique
+  name      String
+  email     String   @unique
+  avatar    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  emails          Email[]
+  slackConnection SlackConnection?
+
+  @@map("users")
+}
+
+enum EmailStatus {
+  scheduled
+  processing
+  sent
+  failed
+}
+
+model Email {
+  id           String      @id @default(uuid())
+  userId       String
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  recipient    String
+  subject      String
+  body         String
+  senderEmail  String
+
+  scheduledAt  DateTime
+  sentAt       DateTime?
+  status       EmailStatus @default(scheduled)
+
+  // per-request scheduling options (kept per-email so each job is self-contained)
+  delayBetweenEmails Int   @default(2000) // ms
+  hourlyLimit        Int   @default(200)
+
+  messageId    String?
+  previewUrl   String?
+  error        String?
+
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([senderEmail])
+  @@map("emails")
+}
+
+model SlackConnection {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  accessToken String
+  teamName    String?
+  teamId      String?
+  channelId   String?
+  slackUserId String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("slack_connections")
+}
